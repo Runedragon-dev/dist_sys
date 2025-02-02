@@ -46,3 +46,6 @@
 [Все что есть](https://github.com/Runedragon-dev/dist_sys/tree/main/src/MLWebApi)
 [REST API](https://github.com/Runedragon-dev/dist_sys/tree/main/src/MLWebApi/rest/rest.go)
 [REST API тесты](https://github.com/Runedragon-dev/dist_sys/tree/main/src/MLWebApi/rest/rest_test.go)
+
+### Скриншоты демонстрирующие работу
+![Test.](Postman_GetPhoto_Tests_Response.png)
