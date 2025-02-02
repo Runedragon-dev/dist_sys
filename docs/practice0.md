@@ -43,6 +43,6 @@
 Еще не дошел до этапа, когда прописал бы общение моделей и API, но идея такова, что модели получают изображения из API, и загружают в него 3д модели, после чего 3дмодель должна отобразиться у пользователя в приложении. На данный момент у меня есть почти готовое API и уже порядочно обученная нейросеть, но ей еще надо прописать процесс общения с API.
 
 **Исходный код**  
-[Все что есть]([\src\MLWebApi](https://github.com/Runedragon-dev/dist_sys/tree/main/src/MLWebApi))
-[REST API]([src\MLWebApi\rest\rest.go](https://github.com/Runedragon-dev/dist_sys/tree/main/src/MLWebApi/rest/rest.go))
-[REST API тесты]([src\MLWebApi\rest\rest.go](https://github.com/Runedragon-dev/dist_sys/tree/main/src/MLWebApi/rest/rest_test.go))
+[Все что есть](https://github.com/Runedragon-dev/dist_sys/tree/main/src/MLWebApi)
+[REST API](https://github.com/Runedragon-dev/dist_sys/tree/main/src/MLWebApi/rest/rest.go)
+[REST API тесты](https://github.com/Runedragon-dev/dist_sys/tree/main/src/MLWebApi/rest/rest_test.go)
