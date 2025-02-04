@@ -10,7 +10,7 @@ import (
 
 func main() {
 	fmt.Println("running")
-	os.Setenv("DATABASE_URL", "postgres://postgres:denis471248@localhost:5432/photos_3d")
+	os.Setenv("DATABASE_URL", "")
 	router := gin.Default()
 	rest.Load()
 	defer rest.UnLoad()
