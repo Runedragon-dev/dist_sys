@@ -10,7 +10,7 @@ Infrastructure - модуль datamodel
 
 1. Добавил механизм опроса и рассылки фото по моделям в модуле rest.
 2. Написал [прототип](https://github.com/Runedragon-dev/dist_sys/tree/main/src/ModelAPI) api для самих нейросетей. Сама модель весит 9гб, поэтому на гитхаб, увы не влезет.
-3. Написал Dockerfile для обоих api, протестировал основной контейнер (rest api).
+3. Написал [Dockerfile](https://github.com/Runedragon-dev/dist_sys/blob/main/src/MLWebApi/Dockerfile) для обоих api, протестировал основной контейнер (rest api).
 
 ![Приложение работает.](practice_1_app_work.png)
 
