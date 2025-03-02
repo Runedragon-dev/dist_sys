@@ -1,23 +1,123 @@
 import os
+
+import numpy as np
 import torch
 from PIL import Image
-from pytorch3d.io import load_objs_as_meshes
-from pytorch3d.ops import sample_points_from_meshes
 import glob
-from pytorch3d.io import load_obj
 import pickle
+import torch
 import torch.nn as nn
 import torch_geometric
 from torch_geometric.nn import GCNConv
 import torch.nn.functional as F
-import inspect
-import _operator
-import torch_geometric
-import typing
-
-
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+class ShapeNetDatasetFolders(torch.utils.data.Dataset):
+    def __init__(self, root_dir, transform=None):
+        self.root_dir = root_dir
+        self.transform = transform
+        self.data = []
+
+        # Проходим по каждой модели в корневой директории
+        for model_folder in os.listdir(root_dir):
+            model_path = os.path.join(root_dir, model_folder)
+            model_file = os.path.join(model_path, "model.obj")
+
+            # Проверяем, что путь содержит файл модели
+            if os.path.exists(model_file):
+                # Сохраняем пути к изображениям с разных ракурсов
+                views = ["back.png", "front.png", "left.png", "right.png"]
+                for view in views:
+                    image_path = os.path.join(model_path, view)
+                    if os.path.exists(image_path):
+                        # Добавляем запись: каждый ракурс изображения + модель
+                        self.data.append({
+                            "model_file": model_file,
+                            "image_file": image_path
+                        })
+def rgb_to_grayscale_3_channels(image: torch.Tensor) -> torch.Tensor:
+    """
+    Преобразует RGB-изображение в градации серого с сохранением 3 каналов.
+
+    :param image: Тензор изображения с размерностью (C, H, W), где C=3.
+    :return: Тензор изображения с градациями серого и размерностью (3, H, W).
+    """
+    if image.shape[0] != 3:
+        raise ValueError("Ожидается изображение с 3 каналами (RGB).")
+
+    # Коэффициенты для преобразования в оттенки серого
+    weights = torch.tensor([0.2989, 0.5870, 0.1140], device=image.device)
+    grayscale = (weights.view(3, 1, 1) * image).sum(dim=0, keepdim=True)  # Размер (1, H, W)
+
+    # Копируем серый канал в 3 канала
+    grayscale_3_channels = grayscale.repeat(3, 1, 1)  # Размер (3, H, W)
+
+    return grayscale_3_channels
+
+def sample_points(points, num_samples):
+    """
+    Сэмплирует облако точек до фиксированного размера num_samples.
+
+    :param points: Тензор размера (num_points, 3).
+    :param num_samples: Число точек, до которого нужно уменьшить/увеличить облако.
+    :return: Тензор размера (num_samples, 3).
+    """
+    num_points = points.shape[0]
+    if num_points >= num_samples:
+        # Случайное подвыборка
+        indices = torch.randperm(num_points)[:num_samples]
+        return points[indices]
+    else:
+        # Если точек меньше, дублируем их
+        num_missing = num_samples - num_points
+        duplicated_points = points[torch.randint(0, num_points, (num_missing,))]
+        return torch.cat([points, duplicated_points])
+
+def normalize_points_coords(points):
+    """
+    Нормализует облако точек.
+    1. Вычитает центр масс.
+    2. Нормализует расстояние точек от центра.
+
+    :param points: Тензор размера (num_points, 3).
+    :return: Нормализованный тензор.
+    """
+    # Вычисляем центр масс облака точек (среднее значение по каждой оси)
+    # centroid = points.mean(dim=0)
+
+    # # Сдвигаем облако точек, чтобы центр масс оказался в начале координат
+    # points_centered = points - centroid
+
+    # # Нормализуем расстояние от центра
+    # # Нахождение максимального расстояния от центра
+    # max_distance = torch.max(torch.norm(points_centered, dim=1))
+
+    # # Нормализуем облако точек, деля на максимальное расстояние
+    # points_normalized = points_centered / max_distance
+    min_vals = torch.min(points, dim=0).values
+    max_vals = torch.max(points, dim=0).values
+
+    # Нормализация координат в диапазон [0, 1]
+    points_normalized = (points - min_vals) / (max_vals - min_vals)
+    return points_normalized*10
+
+def normalize_point_cloud(points, num_samples = 1024):
+    """
+    Нормализует облако точек до фиксированного размера.
+
+    :param points: Тензор размера (num_points, 3).
+    :param num_samples: Число точек в выходном облаке.
+    :return: Тензор размера (num_samples, 3).
+    """
+    num_points = points.shape[0]
+    if num_points >= num_samples:
+        return sample_points(points, num_samples)
+    else:
+        num_missing = num_samples - num_points
+        duplicated_points = points[torch.randint(0, num_points, (num_missing,))]
+        return torch.cat([points, duplicated_points])
+
 
 class ZPointDataset(torch.utils.data.Dataset):
     def __init__(self, root_dir, transform=None):
@@ -25,9 +125,8 @@ class ZPointDataset(torch.utils.data.Dataset):
         self.transform = transform
         self.data = []
 
-        # Проходим по каждой модели в корневой директории
         for model_image in [model for model in os.listdir(root_dir) if model.endswith(".png")]:
-            # Добавляем запись: каждый ракурс изображения + модель
+
 
             if model_image==".ipynb_checkpoints":
               continue
@@ -74,6 +173,7 @@ class ZPointDataset(torch.utils.data.Dataset):
       return image, verts
 
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def generate_edges_8_neighbors(H, W):
     edges = []
@@ -191,7 +291,7 @@ class GCNDepthEstimation(nn.Module):
         self.image_to_graph = ImageToGraph(224, 224)
 
         self.gcn1 = GCNLayer(in_channels, hidden_channels)
-        self.gcn2 = GCNLayer(hidden_channels, hidden_channels)
+        #self.gcn2 = GCNLayer(hidden_channels, hidden_channels)
         self.gcn3 = GCNLayer(hidden_channels, out_channels)
 
         self.fc = nn.Linear(224 * 224 * out_channels, 224 * 224)
@@ -202,8 +302,8 @@ class GCNDepthEstimation(nn.Module):
         edge_index = edge_index.to(device)
         # Применяем GCN
         x = self.gcn1(x_flat, edge_index)
-        x = F.relu(x)
-        x = self.gcn2(x, edge_index)
+        #x = F.relu(x)
+        #x = self.gcn2(x, edge_index)
         x = F.relu(x)
         x = self.gcn3(x, edge_index)
 
@@ -212,26 +312,3 @@ class GCNDepthEstimation(nn.Module):
         x = x.permute(0, 3, 1, 2)  # [batch, out_channels, H, W]
 
         return x
-
-
-torch.serialization.add_safe_globals([getattr])
-torch.serialization.add_safe_globals([GCNDepthEstimation])
-torch.serialization.add_safe_globals([set])
-torch.serialization.add_safe_globals([ImageToGraph])
-torch.serialization.add_safe_globals([GCNLayer])
-torch.serialization.add_safe_globals([GCNConv])
-torch.serialization.add_safe_globals([torch_geometric.nn.aggr.basic.SumAggregation])
-torch.serialization.add_safe_globals([torch_geometric.nn.dense.linear.Linear])
-torch.serialization.add_safe_globals([torch_geometric.inspector.Inspector])
-torch.serialization.add_safe_globals([torch_geometric.inspector.Signature])
-torch.serialization.add_safe_globals([torch_geometric.inspector.Parameter])
-torch.serialization.add_safe_globals([inspect._empty])
-torch.serialization.add_safe_globals([_operator.getitem])
-torch.serialization.add_safe_globals([typing.Union])
-torch.serialization.add_safe_globals([type])
-torch.serialization.add_safe_globals([int])
-torch.serialization.add_safe_globals([typing.OrderedDict])
-torch.serialization.add_safe_globals([torch.nn.modules.linear.Linear])
-
-model =  GCNDepthEstimation()
-model.load_state_dict(torch.load("/content/GCN_model")())

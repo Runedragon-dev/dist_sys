@@ -2,6 +2,9 @@ package rest
 
 import (
 	"bufio"
+	"bytes"
+	"encoding/json"
+	"time"
 
 	"fmt"
 	"net/http"
@@ -12,6 +15,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 )
+
+//Application
 
 type Photo3D struct {
 	ID    string `json:"id"`
@@ -60,16 +65,19 @@ type StatusMsg struct {
 }
 
 var models []string
+var modelsUrls []string
 
 // checkError checks if there error which means tokens are not equal, but not quits application and sends Forbidden status error as an answer
 func checkAccess(err error, c *gin.Context, returnOnSucces bool, token string) {
-	if err != nil || (token != "" && slices.Contains(models, token)) {
+	if (err != nil && err.Error() != "no rows in result set") && !(token != "" && slices.Contains(models, token)) {
 		msg := ErrorMsg{
 			Error: "Unauthorized access",
 		}
+		fmt.Println(err)
 		c.IndentedJSON(http.StatusForbidden, msg)
 	} else {
 		if returnOnSucces {
+			fmt.Println("success")
 			status := StatusMsg{Status: "success"}
 			c.IndentedJSON(http.StatusOK, status)
 		}
@@ -96,6 +104,24 @@ func Load() {
 		fmt.Println("token :", line)
 		models = append(models, line)
 	}
+	file, err = os.Open("ModelsURLs")
+	datamodel.CheckError(err)
+	if err != nil {
+		fmt.Println("Ошибка при открытии файла:", err)
+		return
+	}
+	defer file.Close()
+
+	// Создаем новый сканер
+	scanner = bufio.NewScanner(file)
+
+	// Читаем файл построчно
+	for scanner.Scan() {
+		line := scanner.Text() // Получаем строку
+		fmt.Println("url :", line)
+		modelsUrls = append(modelsUrls, line)
+	}
+	go processQueue()
 }
 
 func UnLoad() {
@@ -178,9 +204,8 @@ func PostPhoto(c *gin.Context) {
 
 // DeletePhoto deletes photo by given id if token of user is euqal to the one who loaded it and returns success, otherwise it returns forbidden status with error
 func DeletePhoto(c *gin.Context) {
-	token := c.Param("token")
 	id := c.Param("id")
-
+	token := c.Param("token")
 	var text string
 
 	err := datamodel.DeletePhoto(id, token).Scan(&text)
@@ -194,9 +219,11 @@ func PutModel(c *gin.Context) {
 
 	err := c.BindJSON(&model)
 	//datamodel.CheckError(err)
-
-	err = datamodel.InsertModel(model.Model, model.ID).Scan(&text)
-	checkAccess(err, c, true, model.Token)
+	fmt.Println(err)
+	if slices.Contains(models, model.Token) {
+		err = datamodel.InsertModel(model.Model, model.ID).Scan(&text)
+		checkAccess(err, c, true, model.Token)
+	}
 }
 
 // GetPhotoOrder responds with id and order(to process, 0 means photo is processed right now) of photo with given id and token
@@ -226,9 +253,78 @@ func PutOrder(c *gin.Context) {
 	var photo PhotoChangeOrder
 
 	err := c.BindJSON(&photo)
-	//datamodel.CheckError(err)
-	target := datamodel.SelectFirstUnprocessedPhotoOrder() + len(models) + photo.Order
-	datamodel.IncreaseOrderOver(target)
-	err = datamodel.SetOrder(target, photo.ID).Scan(&text)
+	if slices.Contains(models, photo.Token) {
+		//datamodel.CheckError(err)
+		target := datamodel.SelectFirstUnprocessedPhotoOrder() + len(models) + photo.Order
+		datamodel.IncreaseOrderOver(target)
+		err = datamodel.SetOrder(target, photo.ID).Scan(&text)
+	}
 	checkAccess(err, c, true, photo.Token)
+}
+
+// Checks if the model is used
+func isPythonAPIBusy(pythonAPIURL string) bool {
+	resp, err := http.Get(pythonAPIURL + "/status")
+	if err != nil {
+		fmt.Println("Ошибка запроса /status:", err)
+		return true
+	}
+	defer resp.Body.Close()
+
+	var result map[string]interface{}
+	json.NewDecoder(resp.Body).Decode(&result)
+	return result["busy"].(bool)
+}
+
+// sends photo to model
+func sendPhotoToPythonAPI(photo Photo, pythonAPIURL string) {
+	jsonData, _ := json.Marshal(photo)
+	resp, err := http.Post(pythonAPIURL+"/upload", "application/json", bytes.NewBuffer(jsonData))
+	if err != nil {
+		fmt.Println("Ошибка отправки фото:", err)
+		return
+	}
+	defer resp.Body.Close()
+	fmt.Println("Фото ID", photo.ID, "отправлено в обработку")
+}
+
+// returns array containing first len(modelsUrls) unprocessed photos
+func getUnprocessedPhotos() []Photo {
+	rows := datamodel.SelectNUnprocessedPhotos(len(modelsUrls))
+	var photos []Photo
+	for rows.Next() {
+		var id string
+		var photo_bytes []byte
+		err := rows.Scan(&id, &photo_bytes)
+		photo := Photo{
+			ID:    id,
+			Photo: photo_bytes,
+		}
+		if err != nil {
+			fmt.Println("Ошибка обработки SQL запроса", err)
+		}
+		photos = append(photos, photo)
+	}
+	return photos
+}
+
+// processes the images
+func processQueue() {
+	for {
+		//photo, found := getNextUnprocessedPhoto()
+		current := 0
+		photos := getUnprocessedPhotos()
+		for _, link := range modelsUrls {
+
+			if isPythonAPIBusy(link) {
+				time.Sleep(2 * time.Second)
+				continue
+			}
+
+			fmt.Println("sending the photo with ID", photos[current].ID, "to processing")
+			sendPhotoToPythonAPI(photos[current], link)
+			current++
+		}
+		time.Sleep(5 * time.Second)
+	}
 }

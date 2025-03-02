@@ -10,6 +10,7 @@ import (
 
 func main() {
 	fmt.Println("running")
+	//os.Setenv("DATABASE_URL", "")
 	os.Setenv("DATABASE_URL", "")
 	router := gin.Default()
 	rest.Load()
@@ -22,6 +23,6 @@ func main() {
 	router.DELETE("/deletephoto/:id/:token", rest.DeletePhoto)
 	router.PUT("/putmodel", rest.PutModel)
 	router.GET("/getorder/:id/:token", rest.GetPhotoOrder)
-	router.PUT("/putorder/:id/:token", rest.PutOrder)
+	router.PUT("/putorder/", rest.PutOrder)
 	router.Run("localhost:8080")
 }
