@@ -1,1 +1,1 @@
-localhost:8080/putmodel
+http://host.docker.internal:8080/putmodel

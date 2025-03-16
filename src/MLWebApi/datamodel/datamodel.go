@@ -53,7 +53,7 @@ func DeletePhoto(id string, token string) pgx.Row {
 	return conn.QueryRow(context.Background(), "delete from photo3d where id = $1 and token = $2;", id, token)
 }
 
-func InsertModel(model []byte, id string) pgx.Row {
+func InsertModel(model string, id string) pgx.Row {
 	return conn.QueryRow(context.Background(), "update photo3d set model = $1 where id = $2;", model, id)
 }
 

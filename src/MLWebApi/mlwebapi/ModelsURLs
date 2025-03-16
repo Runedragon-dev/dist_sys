@@ -1,1 +1,1 @@
-http://localhost:8081/upload
+http://host.docker.internal:8081

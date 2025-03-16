@@ -4,12 +4,12 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
-	"time"
-
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"slices"
+	"time"
 
 	"github.com/runderagon-dev/mlwebapi/datamodel"
 
@@ -41,7 +41,7 @@ type Photo struct {
 type Model struct {
 	ID    string `json:"id"`
 	Token string `json:"token"`
-	Model []byte `json:"model"`
+	Model string `json:"model"`
 }
 
 type PhotoOrder struct {
@@ -121,7 +121,7 @@ func Load() {
 		fmt.Println("url :", line)
 		modelsUrls = append(modelsUrls, line)
 	}
-	go processQueue()
+
 }
 
 func UnLoad() {
@@ -185,7 +185,7 @@ func PostPhoto(c *gin.Context) {
 	token := c.Param("token")
 
 	var photo PhotoRequest
-
+	fmt.Println("adding photo on token", token)
 	err := c.BindJSON(&photo)
 	//datamodel.CheckError(err)
 
@@ -217,13 +217,37 @@ func PutModel(c *gin.Context) {
 	var text string
 	var model Model
 
-	err := c.BindJSON(&model)
-	//datamodel.CheckError(err)
-	fmt.Println(err)
+	body, err := io.ReadAll(c.Request.Body)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Ошибка чтения тела запроса"})
+		return
+	}
+
+	fmt.Println("Тело запроса:", string(body))
+
+	var inner string
+	if err := json.Unmarshal(body, &inner); err == nil {
+
+		if err := json.Unmarshal([]byte(inner), &model); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Невалидный JSON во внутреннем слое"})
+			return
+		}
+	} else {
+
+		if err := json.Unmarshal(body, &model); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Невалидный JSON"})
+			return
+		}
+	}
+
+	fmt.Printf("Полученная модель: %+v\n", model)
+	fmt.Println("error", err)
+	fmt.Println("adding model")
 	if slices.Contains(models, model.Token) {
 		err = datamodel.InsertModel(model.Model, model.ID).Scan(&text)
 		checkAccess(err, c, true, model.Token)
 	}
+
 }
 
 // GetPhotoOrder responds with id and order(to process, 0 means photo is processed right now) of photo with given id and token
@@ -308,23 +332,49 @@ func getUnprocessedPhotos() []Photo {
 	return photos
 }
 
-// processes the images
-func processQueue() {
-	for {
-		//photo, found := getNextUnprocessedPhoto()
-		current := 0
-		photos := getUnprocessedPhotos()
-		for _, link := range modelsUrls {
+var (
+	photoQueue = make(chan Photo, 100)
+	workers    = 5
+)
 
+// worker
+func worker(id int) {
+	for photo := range photoQueue {
+		for _, link := range modelsUrls {
 			if isPythonAPIBusy(link) {
 				time.Sleep(2 * time.Second)
 				continue
 			}
-
-			fmt.Println("sending the photo with ID", photos[current].ID, "to processing")
-			sendPhotoToPythonAPI(photos[current], link)
-			current++
+			fmt.Printf("Worker %d отправляет фото с ID %s на %s\n", id, photo.ID, link)
+			sendPhotoToPythonAPI(photo, link)
 		}
-		time.Sleep(5 * time.Second)
+	}
+}
+
+// startWorkers
+func StartWorkers(n int) {
+	for i := 0; i < n; i++ {
+		go worker(i)
+	}
+}
+
+// processQueue
+func ProcessQueue() {
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+	for range ticker.C {
+		photos := getUnprocessedPhotos()
+		if len(photos) == 0 {
+			continue
+		}
+		for _, photo := range photos {
+
+			select {
+			case photoQueue <- photo:
+				fmt.Println("Фото с ID", photo.ID, "добавлено в очередь")
+			default:
+				fmt.Println("Очередь переполнена, пропускаем фото с ID", photo.ID)
+			}
+		}
 	}
 }

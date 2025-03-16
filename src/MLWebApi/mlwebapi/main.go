@@ -10,11 +10,13 @@ import (
 
 func main() {
 	fmt.Println("running")
-	//os.Setenv("DATABASE_URL", "")
+
 	os.Setenv("DATABASE_URL", "")
 	router := gin.Default()
 	rest.Load()
 	defer rest.UnLoad()
+	go rest.StartWorkers(1)
+	go rest.ProcessQueue()
 
 	router.GET("/photo/:id/:token/", rest.GetPhoto)
 	router.GET("/photos/:token", rest.GetUserPhotos)
@@ -24,5 +26,5 @@ func main() {
 	router.PUT("/putmodel", rest.PutModel)
 	router.GET("/getorder/:id/:token", rest.GetPhotoOrder)
 	router.PUT("/putorder/", rest.PutOrder)
-	router.Run("localhost:8080")
+	router.Run(":8080")
 }
