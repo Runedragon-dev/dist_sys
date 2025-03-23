@@ -180,14 +180,14 @@ func GetUserUnprocessedPhotos(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, photos)
 }
 
-// PostPhoto loads photo and returs its id and order
+// PostPhoto loads photo and returns its id and order
 func PostPhoto(c *gin.Context) {
 	token := c.Param("token")
 
 	var photo PhotoRequest
 	fmt.Println("adding photo on token", token)
 	err := c.BindJSON(&photo)
-	//datamodel.CheckError(err)
+	datamodel.CheckError(err)
 
 	var order int
 	var id string
@@ -334,7 +334,6 @@ func getUnprocessedPhotos() []Photo {
 
 var (
 	photoQueue = make(chan Photo, 100)
-	workers    = 5
 )
 
 // worker
