@@ -58,7 +58,9 @@ jobs:
         
       - name: Install dependencies
         run: pip install -r src/ModelAPI/requirements.txt
-        
+
+      - name: Install stubs
+        run: mypy --install-types
       - name: Install Python static analyzer
         run: pip install mypy
 
