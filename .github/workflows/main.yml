@@ -61,12 +61,9 @@ jobs:
 
       - name: Install Python static analyzer
         run: pip install mypy
-        
-      - name: Install stubs
-        run: mypy --install-types
-        
+                
       - name: Run mypy
-        run: mypy .
+        run: mypy --install-types .
 
   unit-tests:
     name: Unit Tests
