@@ -1,14 +1,16 @@
-import pytest
-from fastapi.testclient import TestClient
-from main import app, processing, process_image, send_result, process_and_send
-import main
-import torch
-import requests
-from PIL import Image
-import io
 import base64
+import io
 import json
 import os
+
+import pytest
+import requests
+import torch
+from fastapi.testclient import TestClient
+from PIL import Image
+
+import main
+from main import app, process_and_send, process_image, processing, send_result
 
 
 @pytest.fixture(scope="module")

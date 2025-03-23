@@ -1,29 +1,25 @@
+import base64
+import inspect
 import io
 import json
 import os
-import threading
-import requests
-import uvicorn
-from fastapi import FastAPI, BackgroundTasks
-from pydantic import BaseModel
-import ml
-from PIL import Image
-import base64
-import torchvision.transforms as transforms
-import torch
-import os
-
-import numpy as np
-from PIL import Image
 import pickle
+import threading
+import typing
+
+import _operator
+import numpy as np
+import requests
 import torch
 import torch.nn as nn
-from torch_geometric.nn import GCNConv
 import torch.nn.functional as F
-import inspect
-import _operator
 import torch_geometric
-import typing
+import torchvision.transforms as transforms
+import uvicorn
+from fastapi import BackgroundTasks, FastAPI
+from PIL import Image
+from pydantic import BaseModel
+from torch_geometric.nn import GCNConv
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -216,8 +212,8 @@ class ZPointDataset(torch.utils.data.Dataset):
         else:
             # Преобразование в тензор и нормализация
             image = (
-                torch.tensor(np.array(image).transpose(2, 0, 1), dtype=torch.float32)
-                / 255.0
+                    torch.tensor(np.array(image).transpose(2, 0, 1), dtype=torch.float32)
+                    / 255.0
             )
         image = rgb_to_grayscale_3_channels(image)
         return image, verts
@@ -245,7 +241,7 @@ def generate_edges_8_neighbors(H, W):
             ]
             for ni, nj in neighbors:
                 if (
-                    0 <= ni < H and 0 <= nj < W
+                        0 <= ni < H and 0 <= nj < W
                 ):  # Проверяем, что сосед внутри изображения
                     neighbor_idx = ni * W + nj
                     edges.append((current_idx, neighbor_idx))
@@ -267,7 +263,7 @@ def generate_edges_24_neighbors(H, W):
             ]
             for ni, nj in neighbors:
                 if (
-                    0 <= ni < H and 0 <= nj < W
+                        0 <= ni < H and 0 <= nj < W
                 ):  # Проверяем, что сосед внутри изображения
                     neighbor_idx = ni * W + nj
                     edges.append((current_idx, neighbor_idx))
@@ -420,9 +416,8 @@ def send_result(id: int, result: torch.Tensor):
     # Преобразуем тензор в список для отправки JSON-данных
     with open("apilink.txt", "r") as file:
         RESULT_API_URL = file.read()
-    result_list = result.tolist()
     payload = json.dumps(
-        {"id": f"{str(id)}", "token": f"{str(TOKEN)}", "model": f"abc"},
+        {"id": f"{str(id)}", "token": f"{str(TOKEN)}", "model": f"{result}"},
     )  # {str(result_list)}
     print(payload)
     print("sending result")
@@ -462,6 +457,5 @@ def status():
 
 
 if __name__ == "__main__":
-
     port = 8081
     uvicorn.run(app, host="0.0.0.0", port=port)
