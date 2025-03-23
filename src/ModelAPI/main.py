@@ -89,7 +89,7 @@ def rgb_to_grayscale_3_channels(image: Tensor) -> Tensor:
     weights = tensor([0.2989, 0.5870, 0.1140], device=image.device)
     grayscale = (weights.view(3, 1, 1) * image).sum(dim=0,
                                                     keepdim=True)
-    #Размер (1, H, W)
+    # Размер (1, H, W)
 
     # Копируем серый канал в 3 канала
     grayscale_3_channels = grayscale.repeat(3, 1, 1)  # Размер (3, H, W)
@@ -269,8 +269,8 @@ class ImageToGraph(nn.Module):
         batch_size, channels, H, W = x.shape
 
         # Переводим изображение в форму [batch, 3, H*W]
-        x_flat = x.view(batch_size, channels, -1).transpose(1,
-                                                            2)#[batch, H*W, 3]
+        x_flat = x.view(batch_size, channels, -1).transpose(1, 2)
+        # [batch, H*W, 3]
 
         # Генерация графа (соседи)
         row, col = meshgrid(arange(H), arange(W))  # [H, W] сетка
@@ -288,8 +288,8 @@ class ImageToGraph(nn.Module):
                         edges.append((i * W + j, i * W + (j + 1)))
 
             edges = (tensor(
-                edges).t().contiguous())# Получаем список рёбер (
-            # начало и конец)
+                edges).t().contiguous())
+            # Получаем список рёбер (начало и конец)
 
         return x_flat, edges
 
