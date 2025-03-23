@@ -54,7 +54,7 @@ jobs:
         run: go install honnef.co/go/tools/cmd/staticcheck@latest && find . -name "go.mod" -execdir staticcheck ./... \;
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: pip install -r ./src/ModelApi/requirements.txt
       
       - name: Install Python static analyzer
         run: pip install mypy
