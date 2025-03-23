@@ -88,7 +88,8 @@ def rgb_to_grayscale_3_channels(image: Tensor) -> Tensor:
     # Коэффициенты для преобразования в оттенки серого
     weights = tensor([0.2989, 0.5870, 0.1140], device=image.device)
     grayscale = (weights.view(3, 1, 1) * image).sum(dim=0,
-                                                    keepdim=True)  # Размер (1, H, W)
+                                                    keepdim=True)
+    #Размер (1, H, W)
 
     # Копируем серый канал в 3 канала
     grayscale_3_channels = grayscale.repeat(3, 1, 1)  # Размер (3, H, W)
@@ -101,7 +102,8 @@ def sample_points(points, num_samples):
     Сэмплирует облако точек до фиксированного размера num_samples.
 
     :param points: Тензор размера (num_points, 3).
-    :param num_samples: Число точек, до которого нужно уменьшить/увеличить облако.
+    :param num_samples: Число точек, до которого нужно уменьшить/увеличить
+    облако.
     :return: Тензор размера (num_samples, 3).
     """
     num_points = points.shape[0]
@@ -189,7 +191,8 @@ class ZPointDataset(utils.data.Dataset):
         pickle_file = self.data[idx]["pickle_file"]
 
         # # Загрузка модели
-        # mesh = load_objs_as_meshes([model_file], device="cuda",load_textures=False)
+        # mesh = load_objs_as_meshes([model_file], device="cuda",
+        # load_textures=False)
         # # Генерация облака точек с помощью sample_points_from_meshes\
         # sampled_points = sample_points_from_meshes(mesh,num_samples=1024)
         # point_cloud = sampled_points.squeeze(0)  # Получаем облако точек
@@ -226,7 +229,8 @@ def generate_edges_8_neighbors(H, W):
                          (i + 1, j + 1), ]
             for ni, nj in neighbors:
                 if (
-                        0 <= ni < H and 0 <= nj < W):  # Проверяем, что сосед внутри изображения
+                        0 <= ni < H and 0 <= nj < W):  # Проверяем,
+                    # что сосед внутри изображения
                     neighbor_idx = ni * W + nj
                     edges.append((current_idx, neighbor_idx))
     return tensor(edges, dtype=long).t().contiguous()
@@ -246,7 +250,8 @@ def generate_edges_24_neighbors(H, W):
                          ]
             for ni, nj in neighbors:
                 if (
-                        0 <= ni < H and 0 <= nj < W):  # Проверяем, что сосед внутри изображения
+                        0 <= ni < H and 0 <= nj < W):  # Проверяем,
+                    # что сосед внутри изображения
                     neighbor_idx = ni * W + nj
                     edges.append((current_idx, neighbor_idx))
     return tensor(edges, dtype=long).t().contiguous()
@@ -265,7 +270,7 @@ class ImageToGraph(nn.Module):
 
         # Переводим изображение в форму [batch, 3, H*W]
         x_flat = x.view(batch_size, channels, -1).transpose(1,
-                                                            2)  # [batch, H*W, 3]
+                                                            2)#[batch, H*W, 3]
 
         # Генерация графа (соседи)
         row, col = meshgrid(arange(H), arange(W))  # [H, W] сетка
@@ -283,7 +288,8 @@ class ImageToGraph(nn.Module):
                         edges.append((i * W + j, i * W + (j + 1)))
 
             edges = (tensor(
-                edges).t().contiguous())  # Получаем список рёбер (начало и конец)
+                edges).t().contiguous())# Получаем список рёбер (
+            # начало и конец)
 
         return x_flat, edges
 
@@ -419,7 +425,8 @@ def process_and_send(id: int, photo_base64: str):
 
 @app.post("/upload")
 async def upload_image(data: InputData, background_tasks: BackgroundTasks):
-    """Обработчик API: принимает фото и запускает его обработку в фоне, если API свободен."""
+    """Обработчик API:
+     принимает фото и запускает его обработку в фоне, если API свободен."""
     global processing
     with lock:
         if processing:
