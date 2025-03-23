@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 from PIL import Image
 
 import main
-from main import app, process_and_send, process_image, processing, send_result
+from main import app, process_and_send, process_image, send_result
 
 
 @pytest.fixture(scope="module")
@@ -56,14 +56,16 @@ def test_status_busy(client):
 
 def test_upload_busy(client):
     main.processing = True
-    response = client.post("/upload", json={"id": 1, "photo": "base64_encoded_str"})
+    response = client.post("/upload", json={"id": 1,
+                                            "photo": "base64_encoded_str"})
     assert response.status_code == 200
     assert response.json() == {"status": "busy"}
 
 
 def test_upload_success(client):
     assert main.processing is False
-    response = client.post("/upload", json={"id": 1, "photo": "base64_encoded_str"})
+    response = client.post("/upload", json={"id": 1,
+                                            "photo": "base64_encoded_str"})
     assert response.status_code == 200
     assert response.json() == {"status": "success"}
     assert main.processing is True
@@ -90,14 +92,16 @@ def test_send_result(client, mocker):
 
     expected_url = "http://test-api.com"
     expected_payload = json.dumps(
-        {"id": "123", "token": "test_token", "model": "abc"}, separators=(",", ":")
+        {"id": "123", "token": "test_token", "model": "abc"},
+        separators=(",", ":")
     )  # Учитываем компактный вывод json.dumps
     mock_put.assert_called_once_with(expected_url, json=expected_payload)
 
 
 def test_send_result_exception(client, mocker, caplog):
     mock_put = mocker.patch("requests.put")
-    mock_put.side_effect = requests.exceptions.ConnectionError("Connection error")
+    mock_put.side_effect = requests.exceptions.ConnectionError(
+        "Connection error")
 
     send_result(123, torch.tensor([1.0]))
 
@@ -105,7 +109,8 @@ def test_send_result_exception(client, mocker, caplog):
 
 
 def test_process_and_send(mocker):
-    mock_process = mocker.patch("main.process_image", return_value=torch.tensor([1.0]))
+    mock_process = mocker.patch("main.process_image",
+                                return_value=torch.tensor([1.0]))
     mock_send = mocker.patch("main.send_result")
 
     main.processing = True

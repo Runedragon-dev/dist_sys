@@ -10,7 +10,8 @@ import typing
 import _operator
 import numpy as np
 import requests
-import torch
+from torch import cuda, Tensor, randint, max, arange, float32, tensor, long, \
+    meshgrid, serialization, min, load, utils, cat, randperm, device
 import torch.nn as nn
 import torch.nn.functional as F
 import torch_geometric
@@ -21,36 +22,37 @@ from PIL import Image
 from pydantic import BaseModel
 from torch_geometric.nn import GCNConv
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = device("cuda" if cuda.is_available() else "cpu")
 
 
 def init():
-    torch.serialization.add_safe_globals([getattr])
-    torch.serialization.add_safe_globals([GCNDepthEstimation])
-    torch.serialization.add_safe_globals([set])
-    torch.serialization.add_safe_globals([ImageToGraph])
-    torch.serialization.add_safe_globals([GCNLayer])
-    torch.serialization.add_safe_globals([GCNConv])
-    torch.serialization.add_safe_globals([torch_geometric.nn.aggr.basic.SumAggregation])
-    torch.serialization.add_safe_globals([torch_geometric.nn.dense.linear.Linear])
-    torch.serialization.add_safe_globals([torch_geometric.inspector.Inspector])
-    torch.serialization.add_safe_globals([torch_geometric.inspector.Signature])
-    torch.serialization.add_safe_globals([torch_geometric.inspector.Parameter])
-    torch.serialization.add_safe_globals([inspect._empty])
-    torch.serialization.add_safe_globals([_operator.getitem])
-    torch.serialization.add_safe_globals([typing.Union])
-    torch.serialization.add_safe_globals([type])
-    torch.serialization.add_safe_globals([int])
-    torch.serialization.add_safe_globals([typing.OrderedDict])
-    torch.serialization.add_safe_globals([torch.nn.modules.linear.Linear])
+    serialization.add_safe_globals([getattr])
+    serialization.add_safe_globals([GCNDepthEstimation])
+    serialization.add_safe_globals([set])
+    serialization.add_safe_globals([ImageToGraph])
+    serialization.add_safe_globals([GCNLayer])
+    serialization.add_safe_globals([GCNConv])
+    serialization.add_safe_globals(
+        [torch_geometric.nn.aggr.basic.SumAggregation])
+    serialization.add_safe_globals([torch_geometric.nn.dense.linear.Linear])
+    serialization.add_safe_globals([torch_geometric.inspector.Inspector])
+    serialization.add_safe_globals([torch_geometric.inspector.Signature])
+    serialization.add_safe_globals([torch_geometric.inspector.Parameter])
+    serialization.add_safe_globals([inspect._empty])
+    serialization.add_safe_globals([_operator.getitem])
+    serialization.add_safe_globals([typing.Union])
+    serialization.add_safe_globals([type])
+    serialization.add_safe_globals([int])
+    serialization.add_safe_globals([typing.OrderedDict])
+    serialization.add_safe_globals([nn.modules.linear.Linear])
     # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = GCNDepthEstimation()
-    model.load_state_dict(torch.load("GCN_model", weights_only=False)())
+    model.load_state_dict(load("GCN_model", weights_only=False)())
     model.to(device)
     return model
 
 
-class ShapeNetDatasetFolders(torch.utils.data.Dataset):
+class ShapeNetDatasetFolders(utils.data.Dataset):
     def __init__(self, root_dir, transform=None):
         self.root_dir = root_dir
         self.transform = transform
@@ -69,12 +71,11 @@ class ShapeNetDatasetFolders(torch.utils.data.Dataset):
                     image_path = os.path.join(model_path, view)
                     if os.path.exists(image_path):
                         # Добавляем запись: каждый ракурс изображения + модель
-                        self.data.append(
-                            {"model_file": model_file, "image_file": image_path}
-                        )
+                        self.data.append({"model_file": model_file,
+                                          "image_file": image_path})
 
 
-def rgb_to_grayscale_3_channels(image: torch.Tensor) -> torch.Tensor:
+def rgb_to_grayscale_3_channels(image: Tensor) -> Tensor:
     """
     Преобразует RGB-изображение в градации серого с сохранением 3 каналов.
 
@@ -85,10 +86,9 @@ def rgb_to_grayscale_3_channels(image: torch.Tensor) -> torch.Tensor:
         raise ValueError("Ожидается изображение с 3 каналами (RGB).")
 
     # Коэффициенты для преобразования в оттенки серого
-    weights = torch.tensor([0.2989, 0.5870, 0.1140], device=image.device)
-    grayscale = (weights.view(3, 1, 1) * image).sum(
-        dim=0, keepdim=True
-    )  # Размер (1, H, W)
+    weights = tensor([0.2989, 0.5870, 0.1140], device=image.device)
+    grayscale = (weights.view(3, 1, 1) * image).sum(dim=0,
+                                                    keepdim=True)  # Размер (1, H, W)
 
     # Копируем серый канал в 3 канала
     grayscale_3_channels = grayscale.repeat(3, 1, 1)  # Размер (3, H, W)
@@ -107,13 +107,13 @@ def sample_points(points, num_samples):
     num_points = points.shape[0]
     if num_points >= num_samples:
         # Случайное подвыборка
-        indices = torch.randperm(num_points)[:num_samples]
+        indices = randperm(num_points)[:num_samples]
         return points[indices]
     else:
         # Если точек меньше, дублируем их
         num_missing = num_samples - num_points
-        duplicated_points = points[torch.randint(0, num_points, (num_missing,))]
-        return torch.cat([points, duplicated_points])
+        duplicated_points = points[randint(0, num_points, (num_missing,))]
+        return cat([points, duplicated_points])
 
 
 def normalize_points_coords(points):
@@ -137,8 +137,8 @@ def normalize_points_coords(points):
 
     # # Нормализуем облако точек, деля на максимальное расстояние
     # points_normalized = points_centered / max_distance
-    min_vals = torch.min(points, dim=0).values
-    max_vals = torch.max(points, dim=0).values
+    min_vals = min(points, dim=0).values
+    max_vals = max(points, dim=0).values
 
     # Нормализация координат в диапазон [0, 1]
     points_normalized = (points - min_vals) / (max_vals - min_vals)
@@ -158,29 +158,26 @@ def normalize_point_cloud(points, num_samples=1024):
         return sample_points(points, num_samples)
     else:
         num_missing = num_samples - num_points
-        duplicated_points = points[torch.randint(0, num_points, (num_missing,))]
-        return torch.cat([points, duplicated_points])
+        duplicated_points = points[randint(0, num_points, (num_missing,))]
+        return cat([points, duplicated_points])
 
 
-class ZPointDataset(torch.utils.data.Dataset):
+class ZPointDataset(utils.data.Dataset):
     def __init__(self, root_dir, transform=None):
         self.root_dir = root_dir
         self.transform = transform
         self.data = []
 
-        for model_image in [
-            model for model in os.listdir(root_dir) if model.endswith(".png")
-        ]:
+        for model_image in [model for model in os.listdir(root_dir) if
+                            model.endswith(".png")]:
 
             if model_image == ".ipynb_checkpoints":
                 continue
             self.data.append(
-                {
-                    "model_file": root_dir + "/" + model_image[:-4] + ".obj",
-                    "image_file": root_dir + "/" + model_image,
-                    "pickle_file": root_dir + "/" + model_image[:-4] + ".pkl",
-                }
-            )
+                {"model_file": root_dir + "/" + model_image[:-4] + ".obj",
+                 "image_file": root_dir + "/" + model_image,
+                 "pickle_file": root_dir + "/" + model_image[
+                                                 :-4] + ".pkl", })
 
     def __len__(self):
         return len(self.data)
@@ -200,7 +197,7 @@ class ZPointDataset(torch.utils.data.Dataset):
         verts = []
         with open(pickle_file, "rb") as file:
             verts = pickle.load(file)
-        verts = torch.tensor(verts).reshape((1, 224, 224))
+        verts = tensor(verts).reshape((1, 224, 224))
         if len(verts) == 0:
             raise ValueError(f"Model {model_file} contains no vertices.")
 
@@ -211,15 +208,10 @@ class ZPointDataset(torch.utils.data.Dataset):
             image = self.transform(image)
         else:
             # Преобразование в тензор и нормализация
-            image = (
-                    torch.tensor(np.array(image).transpose(2, 0, 1), dtype=torch.float32)
-                    / 255.0
-            )
+            image = (tensor(np.array(image).transpose(2, 0, 1),
+                            dtype=float32) / 255.0)
         image = rgb_to_grayscale_3_channels(image)
         return image, verts
-
-
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 def generate_edges_8_neighbors(H, W):
@@ -229,23 +221,15 @@ def generate_edges_8_neighbors(H, W):
             # Текущий индекс
             current_idx = i * W + j
             # Соседи (8 направлений)
-            neighbors = [
-                (i - 1, j - 1),
-                (i - 1, j),
-                (i - 1, j + 1),
-                (i, j - 1),
-                (i, j + 1),
-                (i + 1, j - 1),
-                (i + 1, j),
-                (i + 1, j + 1),
-            ]
+            neighbors = [(i - 1, j - 1), (i - 1, j), (i - 1, j + 1),
+                         (i, j - 1), (i, j + 1), (i + 1, j - 1), (i + 1, j),
+                         (i + 1, j + 1), ]
             for ni, nj in neighbors:
                 if (
-                        0 <= ni < H and 0 <= nj < W
-                ):  # Проверяем, что сосед внутри изображения
+                        0 <= ni < H and 0 <= nj < W):  # Проверяем, что сосед внутри изображения
                     neighbor_idx = ni * W + nj
                     edges.append((current_idx, neighbor_idx))
-    return torch.tensor(edges, dtype=torch.long).t().contiguous()
+    return tensor(edges, dtype=long).t().contiguous()
 
 
 def generate_edges_24_neighbors(H, W):
@@ -255,19 +239,17 @@ def generate_edges_24_neighbors(H, W):
             # Текущий индекс
             current_idx = i * W + j
             # Соседи (радиус 2)
-            neighbors = [
-                (i + di, j + dj)
-                for di in range(-2, 3)  # -2, -1, 0, 1, 2
-                for dj in range(-2, 3)  # -2, -1, 0, 1, 2
-                if not (di == 0 and dj == 0)  # Исключаем самого себя
-            ]
+            neighbors = [(i + di, j + dj) for di in range(-2, 3)
+                         # -2, -1, 0, 1, 2
+                         for dj in range(-2, 3)  # -2, -1, 0, 1, 2
+                         if not (di == 0 and dj == 0)  # Исключаем самого себя
+                         ]
             for ni, nj in neighbors:
                 if (
-                        0 <= ni < H and 0 <= nj < W
-                ):  # Проверяем, что сосед внутри изображения
+                        0 <= ni < H and 0 <= nj < W):  # Проверяем, что сосед внутри изображения
                     neighbor_idx = ni * W + nj
                     edges.append((current_idx, neighbor_idx))
-    return torch.tensor(edges, dtype=torch.long).t().contiguous()
+    return tensor(edges, dtype=long).t().contiguous()
 
 
 class ImageToGraph(nn.Module):
@@ -282,10 +264,11 @@ class ImageToGraph(nn.Module):
         batch_size, channels, H, W = x.shape
 
         # Переводим изображение в форму [batch, 3, H*W]
-        x_flat = x.view(batch_size, channels, -1).transpose(1, 2)  # [batch, H*W, 3]
+        x_flat = x.view(batch_size, channels, -1).transpose(1,
+                                                            2)  # [batch, H*W, 3]
 
         # Генерация графа (соседи)
-        row, col = torch.meshgrid(torch.arange(H), torch.arange(W))  # [H, W] сетка
+        row, col = meshgrid(arange(H), arange(W))  # [H, W] сетка
         edges = []
         if self.edges_num == 8:
             edges = generate_edges_8_neighbors(H, W)
@@ -299,9 +282,8 @@ class ImageToGraph(nn.Module):
                     if j < W - 1:  # добавляем правого соседа
                         edges.append((i * W + j, i * W + (j + 1)))
 
-            edges = (
-                torch.tensor(edges).t().contiguous()
-            )  # Получаем список рёбер (начало и конец)
+            edges = (tensor(
+                edges).t().contiguous())  # Получаем список рёбер (начало и конец)
 
         return x_flat, edges
 
@@ -316,10 +298,12 @@ class GCNLayer(nn.Module):
 
 
 class GCNDepthEstimation_new(nn.Module):
-    def __init__(self, in_channels=3, hidden_channels=64, out_channels=1, edges_num=4):
+    def __init__(self, in_channels=3, hidden_channels=64, out_channels=1,
+                 edges_num=4):
         super(GCNDepthEstimation_new, self).__init__()
         self.num_edges = edges_num
-        self.image_to_graph = ImageToGraph(224, 224, edges_num=self.num_edges)
+        self.image_to_graph = ImageToGraph(224, 224,
+                                           edges_num=self.num_edges)
 
         self.gcn1 = GCNLayer(in_channels, hidden_channels)
         self.gcn2 = GCNLayer(hidden_channels, hidden_channels)
@@ -396,13 +380,10 @@ class InputData(BaseModel):
 
 def process_image(base64_str: bytes) -> str:
     image_data = base64.b64decode(base64_str)
-    image = Image.open(io.BytesIO(image_data)).convert("RGB")  # Конвертируем в RGB
+    image = Image.open(io.BytesIO(image_data)).convert(
+        "RGB")  # Конвертируем в RGB
 
-    transform = transforms.Compose(
-        [
-            transforms.ToTensor(),
-        ]
-    )
+    transform = transforms.Compose([transforms.ToTensor(), ])
     tensor = transform(image)
     # model = GCNDepthEstimation()
     # model.load_state_dict(torch.load("/GCN_model")())
@@ -412,13 +393,12 @@ def process_image(base64_str: bytes) -> str:
     return tensor
 
 
-def send_result(id: int, result: torch.Tensor):
+def send_result(id: int, result: Tensor):
     # Преобразуем тензор в список для отправки JSON-данных
     with open("apilink.txt", "r") as file:
         RESULT_API_URL = file.read()
-    payload = json.dumps(
-        {"id": f"{str(id)}", "token": f"{str(TOKEN)}", "model": f"{result}"},
-    )  # {str(result_list)}
+    payload = json.dumps({"id": f"{str(id)}", "token": f"{str(TOKEN)}",
+                          "model": f"{result}"}, )  # {str(result_list)}
     print(payload)
     print("sending result")
     try:
