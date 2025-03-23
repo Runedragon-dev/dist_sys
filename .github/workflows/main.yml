@@ -54,7 +54,7 @@ jobs:
         run: go install honnef.co/go/tools/cmd/staticcheck@latest && find . -name "go.mod" -execdir staticcheck ./... \;
 
       - name: Install dependencies
-        run: pip install -r ./src/ModelApi/requirements.txt
+        run: pip install -r src/ModelAPI/requirements.txt
       
       - name: Install Python static analyzer
         run: pip install mypy
@@ -84,7 +84,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: pip install -r ./src/ModelApi/requirements.txt
+        run: pip install -r src/ModelApi/requirements.txt
 
       - name: Run Python unit tests
         run: pytest --disable-warnings
