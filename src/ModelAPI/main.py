@@ -381,7 +381,7 @@ lock = threading.Lock()
 
 class InputData(BaseModel):
     id: int
-    photo: bytes
+    photo: str
 
 
 def process_image(base64_str: str) -> str:
