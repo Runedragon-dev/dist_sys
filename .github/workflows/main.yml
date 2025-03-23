@@ -53,9 +53,12 @@ jobs:
       - name: Run Go staticcheck
         run: go install honnef.co/go/tools/cmd/staticcheck@latest && find . -name "go.mod" -execdir staticcheck ./... \;
 
+      - name: Install torch
+        run: pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118 
+        
       - name: Install dependencies
-        run: pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118 && pip install -r src/ModelAPI/requirements.txt
-      
+        run: pip install -r src/ModelAPI/requirements.txt
+        
       - name: Install Python static analyzer
         run: pip install mypy
 
