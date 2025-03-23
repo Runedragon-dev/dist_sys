@@ -384,7 +384,7 @@ class InputData(BaseModel):
     photo: bytes
 
 
-def process_image(base64_str: bytes) -> str:
+def process_image(base64_str: str) -> str:
     image_data = base64.b64decode(base64_str)
     image = Image.open(io.BytesIO(image_data)).convert(
         "RGB")  # Конвертируем в RGB
@@ -396,10 +396,10 @@ def process_image(base64_str: bytes) -> str:
     #
     # обработка убрана для того чтобы не перегружать систему при тестах
     print("processing")
-    return tensor
+    return str(tensor)
 
 
-def send_result(id: int, result: Tensor):
+def send_result(id: int, result: str):
     # Преобразуем тензор в список для отправки JSON-данных
     with open("apilink.txt", "r") as file:
         RESULT_API_URL = file.read()
