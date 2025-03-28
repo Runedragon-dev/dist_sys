@@ -94,7 +94,7 @@ jobs:
         run: pip install mypy
                 
       - name: Run mypy
-        run: mypy --install-types .
+        run: mypy --install-types --non-interactive .
 
   unit-tests:
     name: Unit Tests
